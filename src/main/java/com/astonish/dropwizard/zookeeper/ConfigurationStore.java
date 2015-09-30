@@ -18,6 +18,7 @@ import javax.ws.rs.core.Response.Status;
 
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.PathChildrenCache;
+import org.apache.curator.framework.recipes.cache.PathChildrenCache.StartMode;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -28,19 +29,17 @@ public class ConfigurationStore<T> {
     private final ObjectMapper mapper;
     private final Class<T> configurationClass;
     private final PathChildrenCache cache;
-    private final CuratorFramework client;
     private final String configPath;
 
     public ConfigurationStore(CuratorFramework client, ZookeeperConfiguration zConfig, ObjectMapper mapper,
             Class<T> configurationClass) {
-        this.client = checkNotNull(client);
         this.mapper = checkNotNull(mapper);
         this.configurationClass = checkNotNull(configurationClass);
         this.configPath = checkNotNull(zConfig.getConfigPath());
         try {
             client.create().forPath(configPath, Files.readAllBytes(Paths.get(zConfig.getConfigurationFile())));
             this.cache = new PathChildrenCache(client, configPath, true);
-            this.cache.start();
+            this.cache.start(StartMode.BUILD_INITIAL_CACHE);
         } catch (Exception e) {
             throw new WebApplicationException(e, Status.INTERNAL_SERVER_ERROR);
         }
@@ -62,8 +61,7 @@ public class ConfigurationStore<T> {
      */
     InputStream configurationAsStream() {
         try {
-            // cache.getCurrentData().get(0).getData()
-            return new ByteArrayInputStream(client.getData().forPath(configPath));
+            return new ByteArrayInputStream(cache.getCurrentData().get(0).getData());
         } catch (Exception e) {
             throw new WebApplicationException(e, Status.INTERNAL_SERVER_ERROR);
         }
